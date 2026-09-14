@@ -1,4 +1,4 @@
 $kind: http-request
-url: ""
+url: "{{api}}/api/v1/"
 method: GET
 order: 1789243694254

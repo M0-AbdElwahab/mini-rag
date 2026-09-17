@@ -56,6 +56,8 @@ class ChunkModel(BaseDataModel):
                 for chunk in batch
             ]
 
+        #    print("DEBUG FIRST CHUNK DICT:", operations[0]._doc if operations else "EMPTY")  # <-- ADD THIS LINE
+
             await self.collection.bulk_write(operations)
         
         return len(chunks)

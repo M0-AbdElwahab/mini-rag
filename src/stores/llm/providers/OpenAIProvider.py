@@ -1,10 +1,7 @@
 from ..LLMInterface import LLMInterface
 from ..LLMEnums import OpenAIEnums
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
 import logging
+from openai import OpenAI
 
 class OpenAIProvider(LLMInterface):
 

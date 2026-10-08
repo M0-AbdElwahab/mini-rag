@@ -21,7 +21,6 @@ from helpers.config import get_settings
 
 app = FastAPI()
 
-
 async def startup_db_client():
     settings = get_settings()
     # Initialize MongoDB client

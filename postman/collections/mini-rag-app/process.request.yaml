@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{api}}/api/v1/data/process/2"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+        // "file_id": "1omyhybz3rbn_test.txt",
+        "chunk_size": 800, 
+        "overlap_size": 20,
+        "do_reset":1
+    }
+order: 4279957645717925

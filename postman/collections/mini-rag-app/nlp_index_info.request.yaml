@@ -1,4 +1,4 @@
 $kind: http-request
-url: ""
+url: "{{api}}/api/v1/nlp/index/info/2"
 method: GET
 order: 4385990446982510

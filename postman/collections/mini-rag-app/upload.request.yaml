@@ -1,4 +1,13 @@
 $kind: http-request
-url: ""
-method: GET
+url: "{{api}}/api/v1/data/upload/2"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src:
+        - /C:/Users/mohamed/Downloads/arabic_test.txt
+      description: ""
+      disabled: false
 order: 3392031432091383

@@ -2,6 +2,9 @@ try:
     from fastapi import FastAPI  # type: ignore[import-not-found]
 except ModuleNotFoundError:
     class FastAPI:
+        def add_middleware(self, *args, **kwargs):
+            pass
+
         def get(self, *args, **kwargs):
             def decorator(func):
                 return func
@@ -20,9 +23,22 @@ from helpers.config import get_settings
 from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from stores.llm.templates.template_parser import TemplateParser
 
-
+#
 
 app = FastAPI()
+try:
+    from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
+except ModuleNotFoundError:
+    class CORSMiddleware:
+        pass
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+#
 
 async def startup_span():
 

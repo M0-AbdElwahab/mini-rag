@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG Document Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9eef2; --panel:#ffffff; --ink:#15222c; --muted:#5d6c78; --line:#d3dce3;
+  --accent:#1f5f8b; --accent-ink:#ffffff; --soft:#e3eef6; --ok:#1d7a4d; --err:#b3372f;
+  font-family:"IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55}
+.app{display:grid;grid-template-columns:340px 1fr;gap:16px;height:100%;padding:16px;max-width:1200px;margin:0 auto}
+@media(max-width:820px){.app{grid-template-columns:1fr;height:auto}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;min-height:0;overflow:auto}
+h1{font-size:20px;margin:0 0 2px;font-weight:600}
+h2{font-size:15px;margin:20px 0 8px;font-weight:600}
+.sub{color:var(--muted);margin:0 0 14px;font-size:13px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input[type=text],input[type=number]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+input[type=file]{width:100%;font:inherit;font-size:13px}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+button{font:inherit;font-weight:500;padding:8px 12px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button.secondary{background:#fff;color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid #7fb4d8;outline-offset:2px}
+.status{font-size:13px;margin-top:8px;min-height:20px;color:var(--muted)}
+.status.ok{color:var(--ok)} .status.err{color:var(--err)}
+.steps{margin:0;padding:0;list-style:none}
+.steps li{border-top:1px solid var(--line);padding:4px 0 10px}
+.steps li:first-child{border-top:0}
+.chat{display:flex;flex-direction:column;height:100%}
+#log{flex:1;overflow:auto;padding:4px 2px 12px;display:flex;flex-direction:column;gap:12px;min-height:320px}
+.empty{color:var(--muted);margin:auto;text-align:center;max-width:380px}
+.msg{max-width:88%;padding:10px 14px;border-radius:8px;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.msg.bot{align-self:flex-start;background:var(--soft);border:1px solid #c9dcea}
+.msg.bot.error{background:#fbeceb;border-color:#e8c2bf;color:var(--err)}
+details{margin-top:8px;font-size:13px;white-space:normal}
+summary{cursor:pointer;color:var(--accent);font-weight:500}
+.src{background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-top:6px;color:var(--ink);max-height:150px;overflow:auto;white-space:pre-wrap}
+.score{display:block;color:var(--muted);font-size:12px;margin-bottom:2px}
+.ask{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.ask input{flex:1}
+.ask .limit{width:110px;flex:none}
+.typing{color:var(--muted);font-style:italic}
+</style>
+</head>
+<body>
+<div class="app">
+  <section aria-label="Documents">
+    <h1>RAG Document Assistant</h1>
+    <p class="sub">Ask questions about your own documents, in Arabic or English.</p>
+
+    <label for="base">API address</label>
+    <input type="text" id="base" value="http://localhost:8000">
+    <label for="pid">Project ID</label>
+    <input type="number" id="pid" value="2" min="1">
+
+    <h2>Prepare a document</h2>
+    <ol class="steps">
+      <li>
+        <label for="file">1. Upload a file (.txt or .pdf)</label>
+        <input type="file" id="file" accept=".txt,.pdf">
+        <button id="btnUpload" style="margin-top:8px;width:100%">Upload file</button>
+        <div class="status" id="stUpload"></div>
+      </li>
+      <li>
+        <label>2. Split into chunks</label>
+        <div class="row">
+          <div><label for="chunk" style="margin-top:0">Chunk size</label><input type="number" id="chunk" value="800"></div>
+          <div><label for="overlap" style="margin-top:0">Overlap</label><input type="number" id="overlap" value="20"></div>
+        </div>
+        <button id="btnProcess" class="secondary" style="margin-top:8px;width:100%">Process files</button>
+        <div class="status" id="stProcess"></div>
+      </li>
+      <li>
+        <label>3. Add chunks to the search index</label>
+        <button id="btnPush" class="secondary" style="width:100%">Index chunks</button>
+        <div class="status" id="stPush"></div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="chat" aria-label="Chat">
+    <div id="log" aria-live="polite">
+      <div class="empty" id="empty">Upload, process and index a document, then ask your first question.</div>
+    </div>
+    <form class="ask" id="askForm" onsubmit="return false">
+      <input type="text" id="q" placeholder="Ask about your document" dir="auto" aria-label="Question" autocomplete="off">
+      <input type="number" id="limit" class="limit" value="3" min="1" max="10" aria-label="Number of source chunks" title="Source chunks to retrieve">
+      <button id="btnAsk" type="submit">Ask</button>
+    </form>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = path => `${$('base').value.replace(/\/+$/,'')}/api/v1/${path}/${$('pid').value}`;
+
+function setStatus(id, text, kind){ const el=$(id); el.textContent=text; el.className='status'+(kind?' '+kind:''); }
+
+async function call(url, options){
+  let res;
+  try { res = await fetch(url, options); }
+  catch(e){ throw new Error('Cannot reach the API. Check the address, that the server is running, and that CORS is enabled.'); }
+  let data = null;
+  try { data = await res.json(); } catch(e){}
+  if(!res.ok){
+    const detail = data && (data.signal || data.detail);
+    throw new Error(detail ? (typeof detail==='string'?detail:JSON.stringify(detail)) : `Request failed (${res.status})`);
+  }
+  return data;
+}
+const post = (url, body) => call(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+
+async function withBusy(btn, st, work){
+  btn.disabled = true; setStatus(st, 'Working...');
+  try { await work(); } catch(e){ setStatus(st, e.message, 'err'); }
+  finally { btn.disabled = false; }
+}
+
+$('btnUpload').onclick = () => withBusy($('btnUpload'), 'stUpload', async () => {
+  const f = $('file').files[0];
+  if(!f) throw new Error('Choose a file first.');
+  const fd = new FormData(); fd.append('file', f);
+  const d = await call(api('data/upload'), {method:'POST', body:fd});
+  setStatus('stUpload', `${d.signal} (id: ${d.file_id})`, 'ok');
+});
+
+$('btnProcess').onclick = () => withBusy($('btnProcess'), 'stProcess', async () => {
+  const d = await post(api('data/process'), {
+    chunk_size:+$('chunk').value, overlap_size:+$('overlap').value, do_reset:1
+  });
+  setStatus('stProcess', `${d.signal}: ${d.inserted_chunks} chunks from ${d.processed_files} file(s)`, 'ok');
+});
+
+$('btnPush').onclick = () => withBusy($('btnPush'), 'stPush', async () => {
+  const d = await post(api('nlp/index/push'), {do_reset:1});
+  setStatus('stPush', `${d.signal}: ${d.inserted_items_count} items indexed`, 'ok');
+});
+
+function addMsg(kind, text){
+  const empty = $('empty'); if(empty) empty.remove();
+  const el = document.createElement('div');
+  el.className = 'msg ' + kind;
+  el.dir = 'auto';
+  el.textContent = text;
+  $('log').appendChild(el);
+  $('log').scrollTop = $('log').scrollHeight;
+  return el;
+}
+
+// Small models often echo the prompt's markdown headers; strip them for display only.
+function cleanAnswer(t){
+  if(!t) return t;
+  const s = t.replace(/\*\*/g,'')
+    .split('\n').filter(l => !/^\s*#{1,6}\s/.test(l)).join('\n')
+    .replace(/\n{3,}/g,'\n\n').trim();
+  return s || t.trim();
+}
+
+function addSources(msgEl, results){
+  if(!results || !results.length) return;
+  const det = document.createElement('details');
+  const sum = document.createElement('summary');
+  sum.textContent = `Sources (${results.length})`;
+  det.appendChild(sum);
+  results.forEach((r,i) => {
+    const box = document.createElement('div'); box.className='src'; box.dir='auto';
+    const sc = document.createElement('span'); sc.className='score';
+    sc.textContent = `Chunk ${i+1}, similarity ${Number(r.score).toFixed(3)}`;
+    box.appendChild(sc);
+    box.appendChild(document.createTextNode(r.text));
+    det.appendChild(box);
+  });
+  msgEl.appendChild(det);
+}
+
+$('askForm').addEventListener('submit', async () => {
+  const text = $('q').value.trim();
+  if(!text) return;
+  const limit = +$('limit').value || 3;
+  addMsg('user', text);
+  $('q').value = '';
+  const wait = addMsg('bot', 'Thinking...'); wait.classList.add('typing');
+  $('btnAsk').disabled = true;
+  try {
+    const [ans, srch] = await Promise.all([
+      post(api('nlp/index/answer'), {text, limit}),
+      post(api('nlp/index/search'), {text, limit}).catch(() => null)
+    ]);
+    wait.classList.remove('typing');
+    wait.textContent = cleanAnswer(ans.answer) || 'The model returned no answer.';
+    addSources(wait, srch && srch.results);
+  } catch(e){
+    wait.classList.remove('typing');
+    wait.classList.add('error');
+    wait.textContent = e.message;
+  } finally {
+    $('btnAsk').disabled = false;
+    $('log').scrollTop = $('log').scrollHeight;
+    $('q').focus();
+  }
+});
+</script>
+</body>
+</html>

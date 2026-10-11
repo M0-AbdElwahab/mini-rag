@@ -1,88 +1,174 @@
-# mini-rag
-
-This is a minimal implementation of the RAG model for question answering.
-
-## The Course
-
-This is an educational project where all of the codes where explained (step by step) via a set of `Arabic` youtube videos. Please check the list:
-
-| # | Title                                    | Link                                                                                                 | Codes                                              |
-|---|------------------------------------------|------------------------------------------------------------------------------------------------------|----------------------------------------------------|
-| 1 | About the Course ماذا ولمـــاذا          | [Video](https://www.youtube.com/watch?v=Vv6e2Rb1Q6w&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj)         | NA                                                 |
-| 2 | What will we build ماذا سنبنى في المشروع | [Video](https://www.youtube.com/watch?v=_l5S5CdxE-Q&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj&index=2) | NA                                                 |
-| 3 | Setup your tools الأدوات الأساسية        | [Video](https://www.youtube.com/watch?v=VSFbkFRAT4w&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj&index=3) | NA                                                 |
-| 4 | Project Architecture                     | [Video](https://www.youtube.com/watch?v=Ei_nBwBbFUQ&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj&index=4) | [branch](https://github.com/bakrianoo/mini-rag/tree/tut-001) |
-| 5 | Welcome to FastAPI                       | [Video](https://www.youtube.com/watch?v=cpOuCdzN_Mo&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj&index=5) | [branch](https://github.com/bakrianoo/mini-rag/tree/tut-002) |
-| 6 | Nested Routes + Env Values               | [Video](https://www.youtube.com/watch?v=CrR2Bz2Y7Hw&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj&index=6) | [branch](https://github.com/bakrianoo/mini-rag/tree/tut-003) |
-| 7 | Uploading a File                         | [Video](https://www.youtube.com/watch?v=5alMKCbFqWs&list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj&index=7) | [branch](https://github.com/bakrianoo/mini-rag/tree/tut-004) |
-
-
-
-
-## Requirements
-
-- Python 3.8 or later
-
-#### Install Python using MiniConda
-
-1) Download and install MiniConda from [here](https://docs.anaconda.com/free/miniconda/#quick-command-line-install)
-2) Create a new environment using the following command:
-```bash
-$ conda create -n mini-rag python=3.8
+# mini-RAG
+ 
+A retrieval-augmented question answering API built with FastAPI. Upload a document, split it into chunks, index it in a vector database, then ask questions and get answers grounded in your own text. It works with **Arabic and English** documents.
+ 
+![Demo](docs/demo.gif)
+ 
+## What it does
+ 
+- Uploads `.txt` and `.pdf` files and splits them into overlapping chunks (size and overlap are configurable per request).
+- Stores projects, files and chunks in MongoDB.
+- Embeds chunks with a multilingual embedding model and stores the vectors in Qdrant.
+- Finds the most relevant chunks for a question with semantic search (cosine similarity).
+- Builds a prompt from the retrieved chunks and asks an LLM for an answer.
+- Includes a small browser chat UI that shows each answer together with the source chunks and their similarity scores.
+## How it works
+ 
+```mermaid
+flowchart LR
+    A["Upload .txt / .pdf"] --> B["Process: split into chunks"]
+    B --> M[("MongoDB: projects, files, chunks")]
+    M --> C["Index: embed chunks"]
+    C --> Q[("Qdrant: vectors")]
+    U["Question"] --> E["Embed question"]
+    E --> S["Semantic search"]
+    Q --> S
+    S --> P["Build prompt with retrieved chunks"]
+    P --> L["LLM"]
+    L --> R["Answer + source chunks"]
 ```
-3) Activate the environment:
-```bash
-$ conda activate mini-rag-app
+ 
+The LLM and embedding providers sit behind a factory, so switching between providers is a configuration change, not a code change.
+ 
+## Code structure
+ 
+Every request travels through the same layers:
+ 
+```mermaid
+flowchart LR
+    CL["Client: chat UI, Postman, Swagger"] --> RT["routes: HTTP endpoints"]
+    RT --> CT["controllers: business logic"]
+    CT --> MD["models: MongoDB access"]
+    MD --> DB[("MongoDB")]
+    CT --> VS["stores: vector database provider"]
+    VS --> QD[("Qdrant")]
+    CT --> LS["stores: LLM providers and prompt templates"]
+    LS --> LM["Cohere / Ollama"]
+    HP["helpers: settings loaded from .env"] -.-> CT
 ```
-
-### (Optional) Setup you command line interface for better readability
-
+ 
+The repo also contains `docker/` (MongoDB service), `postman/` (request collection), `ui/` (chat page), `samples/` (test documents) and `docs/` (demo GIF and screenshots).
+ 
+## Tech stack
+ 
+| Part | Technology |
+|---|---|
+| API | FastAPI, Uvicorn |
+| Database | MongoDB (via Motor), run with Docker |
+| Vector database | Qdrant (local storage) |
+| Embeddings | Cohere multilingual embeddings |
+| Generation | Ollama served from Google Colab through ngrok, or Cohere |
+| Testing | Postman collection, Swagger UI at `/docs` |
+ 
+## Screenshots
+ 
+| Upload | Process |
+|---|---|
+| ![Upload](docs/screenshots/upload.png) | ![Process](docs/screenshots/process.png) |
+ 
+| Index | Search |
+|---|---|
+| ![Index](docs/screenshots/push.png) | ![Search](docs/screenshots/search.png) |
+ 
+| Answer | API endpoints |
+|---|---|
+| ![Answer](docs/screenshots/answer.png) | ![Swagger](docs/screenshots/swagger.png) |
+ 
+## Quick start
+ 
+### Requirements
+ 
+- Python 3.11
+- Docker (for MongoDB)
+- A Cohere API key (a free trial key works)
+- Optional: a Google account for the Colab notebook, and an ngrok account
+- Python packages, installed in step 1 from `src/Requirements.txt`:
+  - **API:** FastAPI, Uvicorn, python-multipart, python-dotenv, pydantic-settings, aiofiles
+  - **Documents:** PyMuPDF (PDF reading), LangChain (text splitting)
+  - **Databases:** Motor and PyMongo (MongoDB), qdrant-client (Qdrant)
+  - **LLM clients:** Cohere, and the OpenAI client (used to talk to the Ollama server)
+  - **HTTP:** httpx, pinned to 0.27.2 to avoid a `proxies` error with the OpenAI client
+### 1. Create the environment
+ 
 ```bash
-export PS1="\[\033[01;32m\]\u@\h:\w\n\[\033[00m\]\$ "
+conda create -n mini-rag-app python=3.11
+conda activate mini-rag-app
+pip install -r src/Requirements.txt
 ```
-
-## Installation
-
-### Install the required packages
-
+ 
+### 2. Configure environment variables
+ 
 ```bash
-$ cd src
-$ pip install -r requirements.txt
+cp src/.env.example src/.env
 ```
-
-### Setup the environment variables
-
+ 
+Open `src/.env` and fill in your values. All variables are listed in `src/.env.example`. Never commit `.env`.
+ 
+### 3. Start MongoDB
+ 
 ```bash
-$ cp .env.example .env
+cd docker
+cp .env.example .env     # then edit it with your credentials
+docker compose up -d
 ```
-
-Set your environment variables in the `.env` file. Like `OPENAI_API_KEY` value.
-
-## Run Docker Compose Services
-
+ 
+### 4. (Optional) Run a local LLM with Ollama on Colab
+ 
+Use this if you want generation without a paid API.
+ 
+1. Open the [Colab notebook](https://colab.research.google.com/drive/1d2AVx7rBh0U3UnDTQjLaW-62y1iuvIkb?usp=sharing) and choose **File, Save a copy in Drive**, so you can edit it.
+2. Create a free ngrok account and copy your **auth token**.
+3. In Colab, open the **Secrets** panel (key icon), add the token as a secret, and allow the notebook to access it.
+4. Run all cells. The notebook prints a public **ngrok URL**.
+5. Copy that URL into `src/.env` as the address of the generation server, and save the file.
+The URL changes every session, so repeat steps 4 and 5 each time you restart the notebook.
+ 
+### 5. Run the server
+ 
 ```bash
-$ cdc ..
-$ cd docker
-$ cp .env.example .env
+cd src
+uvicorn main:app --reload --host 0.0.0.0 --port 5000
 ```
-
-- update `.env` with your credentials
-
-
-
-```bash
-$ cd docker
-$ sudo docker compose up -d
-```
-
-## Run the FastAPI server
-
-```bash
-$ cd ..
-$ cd src
-$ uvicorn main:app --reload --host 0.0.0.0 --port 5000
-```
-
-## POSTMAN Collection
-
-Download the POSTMAN collection from [/assets/mini-rag-app.postman_collection.json](/assets/mini-rag-app.postman_collection.json)
+ 
+Open `http://localhost:5000/docs` to explore the API. Restart the server after editing `.env`, because it reads the file only at startup.
+ 
+### 6. Try the chat UI
+ 
+Open `ui/mini-rag-ui.html` in your browser, then:
+ 
+1. Pick a file (try `samples/english_test.txt` or `samples/arabic_test.txt`) and click **Upload file**.
+2. Click **Process files**, then **Index chunks**.
+3. Ask a question, or click one of the sample questions.
+4. Open **Sources** under an answer to see the retrieved chunks and their similarity scores.
+The server enables CORS so the page can call the API. Restrict `allow_origins` in `src/main.py` before deploying anywhere public.
+ 
+## API
+ 
+All routes are under `/api/v1`. `project_id` is any integer that groups your files.
+ 
+| Method | Route | Body | Purpose |
+|---|---|---|---|
+| GET | `/` | none | Welcome and version |
+| POST | `/data/upload/{project_id}` | multipart `file` | Upload a document |
+| POST | `/data/process/{project_id}` | `chunk_size`, `overlap_size`, `do_reset` | Split files into chunks |
+| POST | `/nlp/index/push/{project_id}` | `do_reset` | Embed chunks and store the vectors |
+| GET | `/nlp/index/info/{project_id}` | none | Vector collection info |
+| POST | `/nlp/index/search/{project_id}` | `text`, `limit` | Semantic search |
+| POST | `/nlp/index/answer/{project_id}` | `text`, `limit` | RAG answer |
+ 
+A Postman collection for every route is in the `postman/` folder.
+ 
+## Limitations and lessons
+ 
+- **The number of retrieved chunks (Sources) matters.** In the Arabic test, retrieving 3 chunks added unrelated text, and the small model answered from it instead of from the Cairo chunk, even though search had ranked the Cairo chunk first. Lowering the number to 1 can help in similar cases. It can also hurt: a single chunk may miss an answer that sits elsewhere, so tune it per kind of question.
+- **Answer quality depends on the generation model.** A small LLM can copy the markdown headers from the prompt into its answer. The UI strips those headers for display only.
+- **Chunk size matters.** With 800-character chunks, one chunk can mix several topics, which blurs its embedding. Smaller chunks give sharper retrieval.
+- Uploading the same file twice stores two copies, and both are processed.
+## Credits
+ 
+Built while following the **mini-RAG: From notebooks to the PRODUCTION** course by [Abu Bakr Soliman](https://www.youtube.com/@bakrianoo) ([playlist](https://www.youtube.com/playlist?list=PLvLvlVqNQGHCUR2p0b8a0QpVjDUg50wQj)). The original code is at [bakrianoo/mini-rag](https://github.com/bakrianoo/mini-rag).
+ 
+## License
+ 
+See [LICENSE](LICENSE).
+ 

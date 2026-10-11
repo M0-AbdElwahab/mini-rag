@@ -32,7 +32,7 @@ $ conda create -n mini-rag python=3.8
 ```
 3) Activate the environment:
 ```bash
-$ conda activate mini-rag
+$ conda activate mini-rag-app
 ```
 
 ### (Optional) Setup you command line interface for better readability
@@ -46,6 +46,7 @@ export PS1="\[\033[01;32m\]\u@\h:\w\n\[\033[00m\]\$ "
 ### Install the required packages
 
 ```bash
+$ cd src
 $ pip install -r requirements.txt
 ```
 
@@ -60,6 +61,7 @@ Set your environment variables in the `.env` file. Like `OPENAI_API_KEY` value.
 ## Run Docker Compose Services
 
 ```bash
+$ cdc ..
 $ cd docker
 $ cp .env.example .env
 ```
@@ -76,6 +78,8 @@ $ sudo docker compose up -d
 ## Run the FastAPI server
 
 ```bash
+$ cd ..
+$ cd src
 $ uvicorn main:app --reload --host 0.0.0.0 --port 5000
 ```
 
